@@ -47,15 +47,21 @@ object GraphUI: JPanel(BorderLayout()) {
     }
     
     /**
-     * Hiển thị giao diện thêm node mới
-     * Được gọi khi người dùng nhấp vào nút dấu cộng
+     * Show the add node UI
+     * Called when the user clicks on the add button in the toolbar
      */
     fun showAddNodeUI() {
-        addNode()
+        // If source button is set, use legacy mode
+        if (simpleAddNodePanel.hasSourceButtonCell()) {
+            addNode()
+        } else {
+            // Just show the dialog
+            addNode()
+        }
     }
     
     /**
-     * Hiển thị UI thêm node (phương thức cũ để tương thích)
+     * Show the add node UI (old method for compatibility)
      */
     fun addNode() {
         val centerX = layeredPane.width / 2 - 175 // Adjusted for SimpleAddNodeUI width
@@ -73,7 +79,7 @@ object GraphUI: JPanel(BorderLayout()) {
     }
 
     /**
-     * Đóng giao diện thêm node và trở lại graph panel
+     * Close the add node UI and return to the graph panel
      */
     fun closeNode() {
         // addNodePanel.isVisible = false // Original UI - commented out temporarily
@@ -81,7 +87,7 @@ object GraphUI: JPanel(BorderLayout()) {
     }
 
     /**
-     * Cập nhật lại UI (phương thức cũ để tương thích)
+     * Update the UI layout (old method for compatibility)
      */
     fun repaintLayered() {
         val centerX = layeredPane.width / 2 - 175 // Adjusted for SimpleAddNodeUI width
@@ -97,17 +103,17 @@ object GraphUI: JPanel(BorderLayout()) {
     }
     
     /**
-     * Thêm node mới vào graph sau khi người dùng hoàn thành việc thêm từ AddNodeUI
+     * Add a new node to the graph after the user completes adding from AddNodeUI
      * 
-     * @param title Tiêu đề của node
-     * @param x Tọa độ x
-     * @param y Tọa độ y 
+     * @param title Title of the node
+     * @param x X coordinate
+     * @param y Y coordinate
      */
     fun addNewNode(title: String, x: Double, y: Double) {
-        // Thêm node mới sử dụng GraphPanel
+        // Add new node using GraphPanel
         GraphPanel.addNewNode(title, x, y)
         
-        // Trở lại graph panel
+        // Return to graph panel
         closeNode()
     }
 

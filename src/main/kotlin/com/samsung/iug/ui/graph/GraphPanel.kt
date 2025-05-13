@@ -103,6 +103,9 @@ object GraphPanel : JPanel() {
         graphComponent.graphControl.setMinimumSize(Dimension(0, 0))
         graphComponent.graphControl.setPreferredSize(null)
         
+        // Add edge context menu
+        setupEdgeContextMenu()
+        
         // Setup mouse listeners
         setupGraphListeners()
         
@@ -134,6 +137,115 @@ object GraphPanel : JPanel() {
         
         // Add the graph component to this panel - using a constraint that expands it fully
         add(graphComponent, BorderLayout.CENTER)
+    }
+    
+    /**
+     * Set up edge context menu for deleting connections
+     */
+    private fun setupEdgeContextMenu() {
+        // Add mouse listener for right clicks on edges
+        graphComponent.graphControl.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    val cell = graphComponent.getCellAt(e.x, e.y) as? mxCell
+                    if (cell != null && cell.isEdge) {
+                        // Store the edge for deleting
+                        hoveredEdge = cell
+                        
+                        // Show confirmation dialog
+                        showDeleteConnectionDialog(cell)
+                        
+                        // Debug output
+                        println("Delete connection dialog shown for edge: ${cell.id}")
+                    }
+                }
+            }
+        })
+        
+        // Add mouse motion listener to track hovered edge
+        graphComponent.graphControl.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                val cell = graphComponent.getCellAt(e.x, e.y) as? mxCell
+                hoveredEdge = if (cell != null && cell.isEdge) cell else null
+            }
+        })
+    }
+    
+    /**
+     * Show a dialog asking whether to delete the connection
+     */
+    private fun showDeleteConnectionDialog(edge: mxCell) {
+        // Get source and target nodes
+        val sourceNode = edge.source as? mxCell
+        val targetNode = edge.target as? mxCell
+        
+        // Build description of the connection
+        val connectionDescription = buildConnectionDescription(sourceNode, targetNode)
+        
+        // Show confirmation dialog
+        val options = arrayOf("Delete", "Cancel")
+        val result = JOptionPane.showOptionDialog(
+            this,
+            "Delete connection $connectionDescription?",
+            "Delete Connection",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[1] // Default option is Cancel
+        )
+        
+        // If user clicked Delete
+        if (result == 0) {
+            deleteEdge(edge)
+        }
+    }
+    
+    /**
+     * Build a description of the connection for the dialog
+     */
+    private fun buildConnectionDescription(sourceNode: mxCell?, targetNode: mxCell?): String {
+        // Extract node IDs or labels
+        val sourceId = extractNodeId(sourceNode?.value?.toString() ?: "")
+        val targetId = extractNodeId(targetNode?.value?.toString() ?: "")
+        
+        return "from \"$sourceId\" to \"$targetId\""
+    }
+    
+    /**
+     * Extract a readable ID from node's HTML content
+     */
+    private fun extractNodeId(htmlContent: String): String {
+        // Handle empty content
+        if (htmlContent.isEmpty()) return "Unknown"
+        
+        // Check if this is the User Query node
+        if (htmlContent.contains("User Query")) {
+            return "User Query"
+        }
+        
+        // For regular nodes, extract Step ID from the HTML content
+        val textPattern = "<tr><td[^>]*>(.*?)</td></tr>\\s*<tr><td[^>]*>(.*?)</td></tr>".toRegex(RegexOption.DOT_MATCHES_ALL)
+        val match = textPattern.find(htmlContent)
+        
+        // The second captured group should be the Step ID
+        return match?.groupValues?.getOrNull(2)?.trim() ?: "Unknown"
+    }
+    
+    /**
+     * Delete an edge from the graph
+     */
+    private fun deleteEdge(edge: mxCell) {
+        graph.model.beginUpdate()
+        try {
+            // Remove the edge
+            graph.removeCells(arrayOf(edge))
+            
+            // Refresh the graph
+            graph.refresh()
+        } finally {
+            graph.model.endUpdate()
+        }
     }
     
     /**
@@ -248,9 +360,35 @@ object GraphPanel : JPanel() {
             
             // Create copy dot
             createCopyDot(cell, x + 35, y, isStepNode)
+            
+            // Create trash bin icon to the right of the other dots
+            createTrashIcon(cell, x + 70, y, isStepNode)
         } finally {
             graph.model.endUpdate()
         }
+    }
+    
+    /**
+     * Create trash bin icon
+     */
+    private fun createTrashIcon(cell: mxCell, x: Double, y: Double, isStepNode: Boolean) {
+        val trashDotStyle = if (isStepNode) "trashGreenDot" else "trashDot"
+        val iconColor = if (isStepNode) "#4ade80" else "#6366F1"
+        
+        // Create HTML content with trash bin icon
+        val trashIconHtml = """
+            <div style="display:flex;justify-content:center;align-items:center;width:100%;height:100%;padding-bottom:5px;">
+                <span style="font-size:16px;color:${iconColor};">🗑️</span>
+            </div>
+        """.trimIndent()
+        
+        // Create trash dot
+        val trashDot = graph.insertVertex(
+            parent, null, trashIconHtml,
+            x, y, 20.0, 20.0, trashDotStyle + ";html=1"
+        )
+
+        dotCells.add(trashDot as mxCell)
     }
     
     /**
@@ -318,6 +456,56 @@ object GraphPanel : JPanel() {
             // Copy functionality would be implemented here
             // Currently disabled as per requirements
         }
+        // Check if the clicked cell is a trash dot
+        else if (style.contains("trashDot") || style.contains("trashGreenDot")) {
+            // Find the parent node for this dot
+            val parentNode = findParentNodeForDot(cell)
+            if (parentNode != null) {
+                deleteNode(parentNode)
+            }
+        }
+    }
+    
+    /**
+     * Delete a node from the graph
+     */
+    private fun deleteNode(node: mxCell) {
+        graph.model.beginUpdate()
+        try {
+            // Find all connected edges
+            val allEdges = graph.getEdges(node)
+            
+            // Find any add buttons that might be connected
+            val connectedCells = allEdges.mapNotNull { 
+                val edge = it as mxCell
+                // Get the opposite end of each edge
+                if (edge.source == node) edge.target else edge.source
+            }.filter { 
+                // Filter for add buttons
+                AddButtonConnector.isAddButton(graph, it) 
+            }.toTypedArray()
+            
+            // Remove the add buttons
+            if (connectedCells.isNotEmpty()) {
+                graph.removeCells(connectedCells)
+            }
+            
+            // Now remove the edges
+            if (allEdges.isNotEmpty()) {
+                graph.removeCells(allEdges)
+            }
+            
+            // Remove the node itself
+            graph.removeCells(arrayOf(node))
+            
+            // Clear any dots
+            clearDragDots()
+            
+            // Refresh the graph
+            graph.refresh()
+        } finally {
+            graph.model.endUpdate()
+        }
     }
     
     /**
@@ -349,15 +537,21 @@ object GraphPanel : JPanel() {
         // Get all vertices in the graph
         val vertices = graph.getChildVertices(graph.defaultParent)
         
-        // Find the node that is geometrically above this dot
+        // Find the node that is geometrically related to this dot
         return vertices.filterIsInstance<mxCell>()
             .filter { it != dotCell && !dotCells.contains(it) }
             .minByOrNull { 
                 val dotGeom = graph.getCellGeometry(dotCell)
                 val cellGeom = graph.getCellGeometry(it)
-                val dx = dotGeom.x - cellGeom.x
-                val dy = dotGeom.y - (cellGeom.y + cellGeom.height)
-                if (dx >= 0 && dy >= 0 && dx < cellGeom.width) dy else Double.MAX_VALUE
+                
+                // Calculate distance - handling both dots below and above the node
+                val dx = Math.abs(dotGeom.x - (cellGeom.x + cellGeom.width / 2))
+                val dyBelow = Math.abs(dotGeom.y - (cellGeom.y + cellGeom.height))
+                val dyAbove = Math.abs(dotGeom.y - cellGeom.y)
+                val dy = Math.min(dyBelow, dyAbove)
+                
+                // Return a combined distance measure
+                dx + dy
             }
     }
     
@@ -380,6 +574,8 @@ object GraphPanel : JPanel() {
         createActionDotStyle(stylesheet, "editGreenDot", "#4ade80", commonProps) // Green edit
         createActionDotStyle(stylesheet, "copyDot", "#6366F1", commonProps) // Purple copy
         createActionDotStyle(stylesheet, "copyGreenDot", "#4ade80", commonProps) // Green copy
+        createActionDotStyle(stylesheet, "trashDot", "#6366F1", commonProps) // Purple trash
+        createActionDotStyle(stylesheet, "trashGreenDot", "#4ade80", commonProps) // Green trash
     }
     
     /**
@@ -432,8 +628,8 @@ object GraphPanel : JPanel() {
                 x, y, NODE_WIDTH, NODE_HEIGHT, "stepNode"
             ) as mxCell
             
-            // Add button automatically with AddButtonConnector
-            AddButtonConnector.createAddButtonForNode(graph, parent, cell)
+            // No longer add "+" buttons to subsequent nodes
+            // AddButtonConnector.createAddButtonForNode(graph, parent, cell)
             
             return cell
         } finally {
