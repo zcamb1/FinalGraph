@@ -15,6 +15,8 @@ import com.samsung.iug.graph.listNode
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.geom.Point2D
+import java.awt.event.MouseListener
+import java.awt.event.MouseMotionListener
 
 /**
  * Graph panel using JGraphX (mxGraph) library
@@ -38,6 +40,12 @@ object GraphPanel : JPanel() {
     const val NODE_HEIGHT = 110.0
     const val NODE_STYLE = "userQueryNode"
     const val ADD_BUTTON_STYLE = "addButton"
+    
+    private var panningMouseAdapter: MouseAdapter? = null
+    private var lastPanPoint: Point? = null
+    
+    private var savedMouseListeners: Array<MouseListener>? = null
+    private var savedMouseMotionListeners: Array<MouseMotionListener>? = null
     
     /**
      * Get the graphComponent for use in other UI components
@@ -367,14 +375,19 @@ object GraphPanel : JPanel() {
             // Determine if this is a step node (green border) or query node (purple border)
             val isStepNode = cell.style.contains("stepNode")
             
+            // Check if this is the root User Query node
+            val isUserQueryNode = cell.value?.toString()?.contains("User Query") == true
+            
             // Create edit dot
             createEditDot(cell, x, y, isStepNode)
             
-            // Create copy dot
-            createCopyDot(cell, x + 35, y, isStepNode)
+            // Create copy dot - add more spacing between dots
+            createCopyDot(cell, x + 45, y, isStepNode)
             
-            // Create trash bin icon to the right of the other dots
-            createTrashIcon(cell, x + 70, y, isStepNode)
+            // Create trash bin icon only for non-User Query nodes
+            if (!isUserQueryNode) {
+                createTrashIcon(cell, x + 90, y, isStepNode)
+            }
         } finally {
             graph.model.endUpdate()
         }
@@ -389,15 +402,15 @@ object GraphPanel : JPanel() {
         
         // Create HTML content with trash bin icon
         val trashIconHtml = """
-            <div style="display:flex;justify-content:center;align-items:center;width:100%;height:100%;padding-bottom:5px;">
-                <span style="font-size:16px;color:${iconColor};">🗑️</span>
+            <div style="display:flex;justify-content:center;align-items:center;width:100%;height:100%;padding-bottom:10px;">
+                <span style="font-size:14px;color:${iconColor};">🗑️</span>
             </div>
         """.trimIndent()
         
-        // Create trash dot
+        // Create trash dot - increased size from 20x20 to 30x30
         val trashDot = graph.insertVertex(
             parent, null, trashIconHtml,
-            x, y, 20.0, 20.0, trashDotStyle + ";html=1"
+            x, y, 30.0, 30.0, trashDotStyle + ";html=1"
         )
 
         dotCells.add(trashDot as mxCell)
@@ -413,14 +426,14 @@ object GraphPanel : JPanel() {
         // Create HTML content with enhanced styling for the edit icon
         val editIconHtml = """
             <div style="display:flex;justify-content:center;align-items:center;width:100%;height:100%;padding-bottom:10px;">
-                <span style="font-size:14px;color:${iconColor};">✎</span>
+                <span style="font-size:15px;color:${iconColor};">✎</span>
             </div>
         """.trimIndent()
         
-        // Apply HTML style directly in the style string
+        // Apply HTML style directly in the style string - increased size from 20x20 to 30x30
         val editDot = graph.insertVertex(
             parent, null, editIconHtml,
-            x + 5, y, 20.0, 20.0, editDotStyle + ";html=1"
+            x + 5, y, 30.0, 30.0, editDotStyle + ";html=1"
         )
 
         dotCells.add(editDot as mxCell)
@@ -436,14 +449,14 @@ object GraphPanel : JPanel() {
         // Create HTML content with enhanced styling for the copy icon
         val copyIconHtml = """
             <div style="display:flex;justify-content:center;align-items:center;width:100%;height:100%;padding-bottom:10px;">
-                <span style="font-size:12px;color:${iconColor};">⧉</span>
+                <span style="font-size:14px;color:${iconColor};">⧉</span>
             </div>
         """.trimIndent()
         
-        // Create copy dot
+        // Create copy dot - increased size from 20x20 to 30x30
         val copyDot = graph.insertVertex(
             parent, null, copyIconHtml,
-            x, y, 20.0, 20.0, copyDotStyle + ";html=1"
+            x, y, 30.0, 30.0, copyDotStyle + ";html=1"
         )
 
         dotCells.add(copyDot as mxCell)
@@ -664,5 +677,72 @@ object GraphPanel : JPanel() {
         val parentComponent = parent as? Component
         val parentSize = parentComponent?.getSize() ?: super.getPreferredSize()
         return Dimension(parentSize.width, parentSize.height)
+    }
+    
+    fun setPanningMode(enabled: Boolean) {
+        graphComponent.setPanning(false)
+        graphComponent.setDragEnabled(!enabled)
+        graph.isCellsMovable = !enabled
+        val control = graphComponent.graphControl
+        // Remove old adapter if exists
+        panningMouseAdapter?.let { control.removeMouseListener(it); control.removeMouseMotionListener(it) }
+        panningMouseAdapter = null
+        if (enabled) {
+            // Save and remove all existing listeners
+            savedMouseListeners = control.mouseListeners
+            savedMouseMotionListeners = control.mouseMotionListeners
+            savedMouseListeners?.forEach { control.removeMouseListener(it) }
+            savedMouseMotionListeners?.forEach { control.removeMouseMotionListener(it) }
+            val adapter = object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    if (SwingUtilities.isLeftMouseButton(e)) {
+                        lastPanPoint = e.point
+                        control.cursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
+                        e.consume()
+                    }
+                }
+                override fun mouseReleased(e: MouseEvent) {
+                    lastPanPoint = null
+                    control.cursor = Cursor.getDefaultCursor()
+                    e.consume()
+                }
+                override fun mouseDragged(e: MouseEvent) {
+                    if (SwingUtilities.isLeftMouseButton(e) && lastPanPoint != null) {
+                        val dx = e.point.x - lastPanPoint!!.x
+                        val dy = e.point.y - lastPanPoint!!.y
+                        // Move all nodes by dx, dy
+                        graph.model.beginUpdate()
+                        try {
+                            val parent = graph.defaultParent
+                            val cells = graph.getChildVertices(parent)
+                            for (cell in cells) {
+                                val geom = graph.getCellGeometry(cell)
+                                if (geom != null) {
+                                    val newGeom = geom.clone() as com.mxgraph.model.mxGeometry
+                                    newGeom.x = geom.x + dx
+                                    newGeom.y = geom.y + dy
+                                    graph.model.setGeometry(cell, newGeom)
+                                }
+                            }
+                        } finally {
+                            graph.model.endUpdate()
+                        }
+                        lastPanPoint = e.point
+                        e.consume()
+                    }
+                }
+            }
+            control.addMouseListener(adapter)
+            control.addMouseMotionListener(adapter)
+            panningMouseAdapter = adapter
+        } else {
+            // Restore all saved listeners
+            val localMouseListeners = savedMouseListeners
+            val localMouseMotionListeners = savedMouseMotionListeners
+            localMouseListeners?.forEach { control.addMouseListener(it) }
+            localMouseMotionListeners?.forEach { control.addMouseMotionListener(it) }
+            savedMouseListeners = null
+            savedMouseMotionListeners = null
+        }
     }
 }

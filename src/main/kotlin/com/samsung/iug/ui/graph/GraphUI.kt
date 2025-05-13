@@ -36,9 +36,9 @@ object GraphUI: JPanel(BorderLayout()) {
         simpleAddNodePanel.isVisible = false // Temporary UI for adding nodes
         background = Color(0,0,0,0)
         add(layeredPane, BorderLayout.CENTER)
-        graphPanel.setBounds(0, 200, 1920, 1080)
+        graphPanel.setBounds(0, 0, 1920, 1080)
         graphPanel.repaint()
-        graphPanel.revalidate()
+        graphPanel.revalidate()                             
         layeredPane.repaint()
         layeredPane.revalidate()
 
@@ -124,5 +124,9 @@ object GraphUI: JPanel(BorderLayout()) {
      */
     fun setSourceButtonCell(cell: com.mxgraph.model.mxCell) {
         simpleAddNodePanel.setSourceButtonCell(cell)
+    }
+
+    fun setPanningMode(enabled: Boolean) {
+        graphPanel.setPanningMode(enabled)
     }
 }

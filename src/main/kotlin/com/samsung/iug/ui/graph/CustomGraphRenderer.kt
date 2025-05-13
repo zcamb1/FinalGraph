@@ -81,6 +81,7 @@ object CustomGraphRenderer {
         stepStyle[mxConstants.STYLE_FILLCOLOR] = "none"
         stepStyle[mxConstants.STYLE_STROKECOLOR] = "#4ADE80" // Green border
         stepStyle[mxConstants.STYLE_STROKEWIDTH] = 3
+        stepStyle[mxConstants.STYLE_SHADOW] = "0"
         stepStyle[mxConstants.STYLE_FONTCOLOR] = "#FFFFFF"
         stepStyle[mxConstants.STYLE_ALIGN] = mxConstants.ALIGN_LEFT
         stylesheet.putCellStyle("stepNode", stepStyle)

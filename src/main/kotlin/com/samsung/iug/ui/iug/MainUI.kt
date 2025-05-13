@@ -20,6 +20,8 @@ class MainUI(private val screenWidth: Int, private val screenHeight: Int, privat
     private lateinit var buttonPreview: JButton
     private var previewDialog: JDialog? = null
     private var isPreviewVisible = false
+    private var isPanningMode = false
+    private lateinit var buttonPan: JButton
 
     private var logPanel = LogPanel().apply {
         isVisible = false
@@ -107,10 +109,17 @@ class MainUI(private val screenWidth: Int, private val screenHeight: Int, privat
                 val buttonAdd = createToolBarButton("/images/icon_add.png")
                 val buttonZoomOut = createToolBarButton("/images/icon_zoom_out.png")
                 val buttonZoomIn = createToolBarButton("/images/icon_zoom_in.png")
-                val buttonPan = createToolBarButton("/images/icon_pan.png")
+                buttonPan = createToolBarButton("/images/icon_pan.png")
 
                 buttonAdd.addActionListener {
                     graphPanel.addNode()
+                }
+
+                buttonPan.addActionListener {
+                    isPanningMode = !isPanningMode
+                    GraphUI.setPanningMode(isPanningMode)
+                    buttonPan.background = if (isPanningMode) Color(0x36498C) else Color.DARK_GRAY
+                    buttonPan.repaint()
                 }
 
                 add(buttonAdd)
