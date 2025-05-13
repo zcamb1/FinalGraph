@@ -745,4 +745,11 @@ object GraphPanel : JPanel() {
             savedMouseMotionListeners = null
         }
     }
+    
+    fun zoomIn() {
+        graphComponent.zoomIn()
+    }
+    fun zoomOut() {
+        graphComponent.zoomOut()
+    }
 }

@@ -129,4 +129,11 @@ object GraphUI: JPanel(BorderLayout()) {
     fun setPanningMode(enabled: Boolean) {
         graphPanel.setPanningMode(enabled)
     }
+
+    fun zoomIn() {
+        graphPanel.zoomIn()
+    }
+    fun zoomOut() {
+        graphPanel.zoomOut()
+    }
 }

@@ -60,9 +60,10 @@ object GraphShapes {
             g.color = Color(146, 119, 255)  // purple #9277FF
             
             // Calculate position for the dot
-            val x = state.x.toInt() + 16
-            val y = state.y.toInt() + 13
-            val size = 24 // Size of the dot
+            val scale = state.view.scale
+            val size = (24 * scale).toInt()
+            val x = (state.x.toInt() + 16 * scale).toInt()
+            val y = (state.y.toInt() + 13 * scale).toInt()
             
             // Draw the circle
             g.fillOval(x, y, size, size)
@@ -85,9 +86,10 @@ object GraphShapes {
             g.color = Color(74, 222, 128)  // green #4ADE80
             
             // Calculate position for the dot
-            val x = state.x.toInt() + 16
-            val y = state.y.toInt() + 13
-            val size = 24 // Size of the dot
+            val scale = state.view.scale
+            val size = (24 * scale).toInt()
+            val x = (state.x.toInt() + 16 * scale).toInt()
+            val y = (state.y.toInt() + 13 * scale).toInt()
             
             // Draw the circle
             g.fillOval(x, y, size, size)

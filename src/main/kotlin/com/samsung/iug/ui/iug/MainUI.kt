@@ -122,6 +122,13 @@ class MainUI(private val screenWidth: Int, private val screenHeight: Int, privat
                     buttonPan.repaint()
                 }
 
+                buttonZoomIn.addActionListener {
+                    graphPanel.zoomIn()
+                }
+                buttonZoomOut.addActionListener {
+                    graphPanel.zoomOut()
+                }
+
                 add(buttonAdd)
                 add(buttonZoomOut)
                 add(buttonZoomIn)
