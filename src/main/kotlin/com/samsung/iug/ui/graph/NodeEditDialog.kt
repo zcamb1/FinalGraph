@@ -24,12 +24,16 @@ object NodeEditDialog {
         // Get current content
         val content = cell.value.toString()
         
-        // Extract query from HTML content
-        val queryText = extractTextFromCell(cell)
+        // Determine if this is a step node or user query node
+        val isStepNode = cell.style.contains("stepNode")
+        
+        // Extract node contents
+        val (guideText, stepId) = extractNodeContents(cell)
         
         // Create edit dialog similar to EditUtteranceDialog
         val window = SwingUtilities.getWindowAncestor(parent)
-        val dialog = JDialog(window as Frame, "Edit User Query", true)
+        val dialogTitle = if (isStepNode) "Edit Step" else "Edit User Query"
+        val dialog = JDialog(window as Frame, dialogTitle, true)
         dialog.layout = BorderLayout()
         dialog.isUndecorated = true
         dialog.background = Color(0, 0, 0, 0)
@@ -38,7 +42,8 @@ object NodeEditDialog {
         val panel = createRoundedPanel()
         panel.layout = GridBagLayout()
         
-        val textArea = JTextArea(queryText)
+        // Create text area for guide content
+        val textArea = JTextArea(guideText)
         textArea.foreground = Color.WHITE
         textArea.background = Color(25, 25, 25)
         textArea.caretColor = Color.WHITE
@@ -51,6 +56,16 @@ object NodeEditDialog {
         scrollPane.border = BorderFactory.createLineBorder(Color(100, 100, 100), 1, true)
         scrollPane.preferredSize = Dimension(240, 70)
         
+        // Create step ID field for step nodes
+        val stepIdField = JTextField(stepId)
+        stepIdField.foreground = Color.WHITE
+        stepIdField.background = Color(25, 25, 25)
+        stepIdField.caretColor = Color.WHITE
+        stepIdField.font = Font("Arial", Font.PLAIN, 13)
+        stepIdField.margin = Insets(8, 10, 8, 10)
+        stepIdField.border = BorderFactory.createLineBorder(Color(100, 100, 100), 1, true)
+        stepIdField.preferredSize = Dimension(240, 30)
+        
         val buttonPanel = JPanel(FlowLayout(FlowLayout.CENTER))
         buttonPanel.isOpaque = false
         
@@ -59,8 +74,12 @@ object NodeEditDialog {
             // Update node content
             graph.model.beginUpdate()
             try {
-                // Update cell value with HTML content instead of plain text
-                graph.model.setValue(cell, createQueryNodeHtml(textArea.text))
+                // Update cell value with HTML content based on node type
+                if (isStepNode) {
+                    graph.model.setValue(cell, createStepNodeHtml(textArea.text, stepIdField.text))
+                } else {
+                    graph.model.setValue(cell, createQueryNodeHtml(textArea.text))
+                }
                 
                 // Update node data in listNode if needed
                 if (listNode.listNode.isNotEmpty()) {
@@ -85,17 +104,39 @@ object NodeEditDialog {
         gbc.gridx = 0
         gbc.gridy = 0
         gbc.insets = Insets(10, 10, 5, 10)
-        panel.add(JLabel("EDIT USER QUERY").apply {
+        gbc.fill = GridBagConstraints.HORIZONTAL
+        
+        // Add header label based on node type
+        val headerText = if (isStepNode) "EDIT STEP" else "EDIT USER QUERY"
+        panel.add(JLabel(headerText).apply {
             foreground = Color.WHITE
             font = Font("Arial", Font.BOLD, 14)
         }, gbc)
         
         gbc.gridy = 1
         gbc.insets = Insets(5, 10, 5, 10)
-        panel.add(scrollPane, gbc)
+        panel.add(JLabel("Content:").apply {
+            foreground = Color.WHITE
+            font = Font("Arial", Font.PLAIN, 12)
+        }, gbc)
         
         gbc.gridy = 2
-        gbc.insets = Insets(5, 10, 10, 10)
+        panel.add(scrollPane, gbc)
+        
+        // Add step ID field only for step nodes
+        if (isStepNode) {
+            gbc.gridy = 3
+            panel.add(JLabel("Step ID:").apply {
+                foreground = Color.WHITE
+                font = Font("Arial", Font.PLAIN, 12)
+            }, gbc)
+            
+            gbc.gridy = 4
+            panel.add(stepIdField, gbc)
+        }
+        
+        gbc.gridy = if (isStepNode) 5 else 3
+        gbc.insets = Insets(15, 10, 10, 10)
         panel.add(buttonPanel, gbc)
         
         dialog.contentPane = panel
@@ -179,20 +220,37 @@ object NodeEditDialog {
     }
     
     /**
-     * Extract text from mxCell (from either HTML content or direct string)
+     * Extract both guide text and step ID from a cell
      */
-    private fun extractTextFromCell(cell: mxCell): String {
+    private fun extractNodeContents(cell: mxCell): Pair<String, String> {
         val value = cell.value?.toString() ?: ""
         
+        // Default values
+        var guideText = ""
+        var stepId = ""
+        
         // Check if it's HTML content
-        return if (value.contains("<")) {
-            val textPattern = "<tr><td>(.*?)</td></tr>".toRegex(RegexOption.DOT_MATCHES_ALL)
+        if (value.contains("<")) {
+            val textPattern = "<tr><td>(.*?)</td></tr>\\s*<tr><td[^>]*>(.*?)</td></tr>".toRegex(RegexOption.DOT_MATCHES_ALL)
             val match = textPattern.find(value)
-            match?.groupValues?.get(1)?.unescapeHtml() ?: value
+            
+            if (match != null && match.groupValues.size > 2) {
+                guideText = match.groupValues[1].unescapeHtml()
+                stepId = match.groupValues[2].unescapeHtml()
+            } else {
+                // Fallback to old pattern
+                val oldPattern = "<tr><td>(.*?)</td></tr>".toRegex(RegexOption.DOT_MATCHES_ALL)
+                val oldMatch = oldPattern.find(value)
+                if (oldMatch != null) {
+                    guideText = oldMatch.groupValues[1].unescapeHtml()
+                }
+            }
         } else {
             // It's already plain text
-            value
+            guideText = value
         }
+        
+        return Pair(guideText, stepId)
     }
     
     /**
