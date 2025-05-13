@@ -103,6 +103,16 @@ object GraphPanel : JPanel() {
         graphComponent.graphControl.setMinimumSize(Dimension(0, 0))
         graphComponent.graphControl.setPreferredSize(null)
         
+        // Enable dragging of nodes
+        graph.isCellsMovable = true
+        
+        // Add listener for cell movement to clear action dots
+        graph.addListener(mxEvent.CELLS_MOVED, { _, evt ->
+            // Clear action dots whenever any cell moves
+            clearDragDots()
+            currentHoverCell = null
+        })
+        
         // Add edge context menu
         setupEdgeContextMenu()
         
