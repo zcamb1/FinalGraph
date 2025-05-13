@@ -14,7 +14,7 @@ object AddButtonConnector {
     
     // Hằng số cho vị trí và kích thước
     const val BUTTON_SIZE = 36.0
-    const val HORIZONTAL_SPACING = 150.0
+    const val HORIZONTAL_SPACING = 200.0
     
     /**
      * Tạo nút dấu cộng (+) cho node nguồn và kết nối bằng nét đứt

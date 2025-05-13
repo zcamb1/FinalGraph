@@ -23,6 +23,9 @@ class SimpleAddNodeUI : JPanel() {
     // Reference to the clicked add button cell
     private var sourceButtonCell: mxCell? = null
     
+    // Constants for node spacing
+    private val VERTICAL_SPACING = 50.0 // Increased vertical spacing between nodes
+    
     init {
         layout = BorderLayout(10, 10)
         border = EmptyBorder(20, 20, 20, 20)
@@ -239,6 +242,16 @@ class SimpleAddNodeUI : JPanel() {
                     // Use the same X position as the first child
                     val firstChildGeom = graph.getCellGeometry(childCells.first())
                     newX = firstChildGeom.x
+                    
+                    // Find the bottom-most child to place new node below it with spacing
+                    val bottomMostChild = childCells.maxByOrNull { 
+                        graph.getCellGeometry(it).y + graph.getCellGeometry(it).height 
+                    }
+                    
+                    if (bottomMostChild != null) {
+                        val bottomChildGeom = graph.getCellGeometry(bottomMostChild)
+                        newY = bottomChildGeom.y + bottomChildGeom.height + VERTICAL_SPACING
+                    }
                 }
                 
                 // Get all nodes in the graph to check for potential overlaps
@@ -254,7 +267,6 @@ class SimpleAddNodeUI : JPanel() {
                 
                 // Check for overlaps with any existing node
                 var hasOverlaps = true
-                val padding = 20 // Vertical padding between nodes
                 
                 while (hasOverlaps) {
                     hasOverlaps = false
@@ -270,7 +282,7 @@ class SimpleAddNodeUI : JPanel() {
                         if (potentialBounds.intersects(cellBounds)) {
                             // If we would overlap, move our node down below the current cell
                             hasOverlaps = true
-                            potentialBounds.y = (cellGeom.y + cellGeom.height + padding).toInt()
+                            potentialBounds.y = (cellGeom.y + cellGeom.height + VERTICAL_SPACING).toInt()
                             newY = potentialBounds.y.toDouble()
                             break
                         }

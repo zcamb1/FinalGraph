@@ -65,7 +65,7 @@ object GraphPanel : JPanel() {
         graph.setCellsDisconnectable(false)
         graph.setConnectableEdges(false)
         graph.setCellsBendable(false)
-        
+
         // Configure HTML labels to render properly
         graph.isHtmlLabels = true
 
@@ -84,6 +84,8 @@ object GraphPanel : JPanel() {
         graphComponent.foreground = Color.WHITE
         graphComponent.isFocusable = false
         graphComponent.border = null
+        graphComponent.isDragEnabled = false
+
         
         // Make all components transparent
         graphComponent.isOpaque = false
